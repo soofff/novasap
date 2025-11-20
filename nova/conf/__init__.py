@@ -66,6 +66,7 @@ from nova.conf import vnc
 from nova.conf import workarounds
 from nova.conf import wsgi
 from nova.conf import zvm
+from nova.conf import kubernetes
 
 CONF = cfg.CONF
 
@@ -116,3 +117,4 @@ vnc.register_opts(CONF)
 workarounds.register_opts(CONF)
 wsgi.register_opts(CONF)
 zvm.register_opts(CONF)
+kubernetes.register_opts(CONF)
