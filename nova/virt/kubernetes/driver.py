@@ -35,6 +35,7 @@ from kubernetes import client, config, utils
 
 from nova.virt.kubernetes.os_crd_instance import OsCrdInstance, OsCrdObjBodyInstanceBody, OsCrdObjInstanceAction, OsCrdObjInstanceActionState
 from nova.virt.libvirt import LibvirtDriver
+from nova.virt.node import get_local_node_uuid
 
 LOG = logging.getLogger(__name__)
 
@@ -97,6 +98,9 @@ class KubernetesDriver(driver.ComputeDriver):
         self._os_crd_instance = OsCrdInstance(
             self._kubernetes, CONF.kubernetes.namespace)
 
+        self._hostname = None
+        self._local_node_uuid = None
+
     def init_host(self, host):
         if CONF.kubernetes.apply_crds:
             LOG.debug('trying to apply OS Instance CRD')
@@ -106,6 +110,9 @@ class KubernetesDriver(driver.ComputeDriver):
                 LOG.info('OS Instance CRD created')
             else:
                 LOG.debug('OS Instance CRD already exists')
+
+        self._hostname = host
+        self._local_node_uuid = get_local_node_uuid()
 
     def instance_exists(self, instance) -> bool:
         result = self._os_crd_instance.get(instance)
@@ -387,8 +394,8 @@ class KubernetesDriver(driver.ComputeDriver):
         pass
 
     def get_nodenames_by_uuid(self, refresh=False):
-        # TODO: use crd ?
-        return LibvirtDriver.get_nodenames_by_uuid(self, refresh)
+        # TODO: store to crd ?
+        return {self._local_node_uuid(): self._hostname}
 
     def get_host_cpu_stats(self):
         pass

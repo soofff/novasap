@@ -101,6 +101,12 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
         }]
         }
 
+    def test_init_host(self):
+        driver = kubernetes_driver.KubernetesDriver(None)
+        driver.init_host("test-host")
+        self.assertEqual("test-host", driver._hostname)
+        self.assertIsNotNone(driver._local_node_uuid)
+
     def test_get_host_uptime(self):
         driver = kubernetes_driver.KubernetesDriver(None)
         result = driver.get_host_uptime()
