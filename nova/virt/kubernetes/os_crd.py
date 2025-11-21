@@ -1,7 +1,7 @@
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import asdict, dataclass, fields
 from kubernetes import client
 from kubernetes.client.rest import ApiException
-from typing import ClassVar, Optional, Type, TypeVar, Generic, List
+from typing import ClassVar, Optional, Type, TypeVar, Generic
 
 
 @dataclass
@@ -30,7 +30,7 @@ class OsCrdProperties(object):
         for f in fields(cls):
             json_type = cls.python_type_to_json_type(f.type)
             props[f.name] = {"type": json_type}
-        return {"properties": props}
+        return props
 
     @classmethod
     def to_print(cls):
@@ -68,7 +68,7 @@ class OsCrdObjStatus(OsCrdProperties):
 
 @dataclass
 class OsCrdObjAction(OsCrdProperties):
-    NAME: str = "action"
+    NAME: ClassVar[str] = "action"
 
 
 @dataclass
@@ -171,7 +171,7 @@ class OsCrd(Generic[T]):
             version=self.CRD_VERSION,
             namespace=self.namespace,
             plural=self.CRD_PLURAL,
-            body=obj
+            body=asdict(obj)
         )
 
     def get(self, name: str, obj_type: Type[T] = OsCrdObj) -> Optional[T]:
@@ -207,7 +207,7 @@ class OsCrd(Generic[T]):
             namespace=self.namespace,
             plural=self.CRD_PLURAL,
             name=name,
-            body=patch
+            body=asdict(patch)
         )
 
     def wait_status(self, key: str, name: str, desired_state: str, timeout: int = 60):

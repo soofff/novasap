@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
-from kubernetes.client.rest import ApiException
 
 from nova.objects.instance import Instance
-from nova.virt.kubernetes.os_crd import OsCrd, OsCrdObj, OsCrdObjBody, OsCrdObjMetadata, OsCrdObjMetadataLabels, OsCrdObjSpec, OsCrdObjStatus, OsCrdObjAction
+from nova.virt.kubernetes.os_crd import OsCrd, OsCrdObj, OsCrdObjBody, \
+    OsCrdObjMetadata, OsCrdObjMetadataLabels, \
+    OsCrdObjSpec, OsCrdObjStatus, OsCrdObjAction \
+
 
 
 @dataclass
