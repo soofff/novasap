@@ -201,13 +201,25 @@ class OsCrd(Generic[T]):
         return [obj_type(**item) for item in result.get("items", [])]
 
     def patch(self, name: str, patch: OsCrdObjBody):
+        d = asdict(patch)
+
+        def remove_none_fields(obj):
+            if isinstance(obj, dict):
+                return {k: remove_none_fields(v) for k, v in obj.items() if v is not None}
+            elif isinstance(obj, list):
+                return [remove_none_fields(v) for v in obj if v is not None]
+            else:
+                return obj
+
+        d = remove_none_fields(d)
+
         return self.custom_api.patch_namespaced_custom_object(
             group=self.CRD_GROUP,
             version=self.CRD_VERSION,
             namespace=self.namespace,
             plural=self.CRD_PLURAL,
             name=name,
-            body=asdict(patch)
+            body=d
         )
 
     def wait_status(self, key: str, name: str, desired_state: str, timeout: int = 60):

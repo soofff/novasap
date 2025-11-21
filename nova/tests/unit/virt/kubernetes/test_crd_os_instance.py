@@ -184,10 +184,7 @@ class KubernetesCrdTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsCompa
             'plural': 'osinstances',
             'name': '860f5462-f16e-4836-a6aa-2935fc7fccc0',
             'body': {
-                'spec': None,
-                'status': None,
                 'action': {
                     'destroy': True,
-                    'state': None
                 }}
             })
