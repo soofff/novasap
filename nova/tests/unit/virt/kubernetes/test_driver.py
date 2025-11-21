@@ -182,3 +182,8 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
         test_instance = _create_test_instance()
         driver.resume(None, test_instance, None)
         self.mock_custom_obj_api.return_value.patch_namespaced_custom_object.assert_called()
+
+    def test_get_nodenames_by_uuid(self):
+        driver = _create_driver()
+        result = driver.get_nodenames_by_uuid()
+        self.assertEqual(result, {driver._local_node_uuid: driver._hostname})

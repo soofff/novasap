@@ -395,7 +395,7 @@ class KubernetesDriver(driver.ComputeDriver):
 
     def get_nodenames_by_uuid(self, refresh=False):
         # TODO: store to crd ?
-        return {self._local_node_uuid(): self._hostname}
+        return {self._local_node_uuid: self._hostname}
 
     def get_host_cpu_stats(self):
         pass
