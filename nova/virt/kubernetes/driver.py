@@ -88,7 +88,10 @@ class KubernetesDriver(driver.ComputeDriver):
         super(KubernetesDriver, self).__init__(virtapi)
 
         LOG.debug('Loading Kubernetes configuration')
-        config.load_kube_config()
+        try:
+            config.load_incluster_config()
+        except config.ConfigException:
+            config.load_kube_config()
 
         self._kubernetes = client.ApiClient()
         self._os_crd_instance = OsCrdInstance(
