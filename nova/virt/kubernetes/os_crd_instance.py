@@ -89,8 +89,8 @@ class OsCrdInstance(OsCrd):
     def __init__(self, api_client, namespace):
         super().__init__(api_client, namespace)
 
-    def create(self, instance: Instance):
-        self.create_object(
+    def create(self, instance: Instance) -> bool:
+        return self.create_object(
             OsCrdObjInstance.from_instance(instance)
         )
 

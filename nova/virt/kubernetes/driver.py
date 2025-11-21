@@ -87,15 +87,21 @@ class KubernetesDriver(driver.ComputeDriver):
     def __init__(self, virtapi, scheme="https"):
         super(KubernetesDriver, self).__init__(virtapi)
 
+        LOG.debug('Loading Kubernetes configuration')
         config.load_kube_config()
+
         self._kubernetes = client.ApiClient()
         self._os_crd_instance = OsCrdInstance(
             self._kubernetes, CONF.kubernetes.namespace)
-        self._hostname = None
 
     def init_host(self, host):
-        self._hostname = host
-        self._os_crd_instance.create_manifest()
+        LOG.debug('trying to apply OS Instance CRD')
+        created = self._os_crd_instance.create_manifest()
+
+        if created:
+            LOG.info('OS Instance CRD created')
+        else:
+            LOG.info('OS Instance CRD already exists')
 
     def instance_exists(self, instance) -> bool:
         result = self._os_crd_instance.get(instance)
