@@ -98,13 +98,14 @@ class KubernetesDriver(driver.ComputeDriver):
             self._kubernetes, CONF.kubernetes.namespace)
 
     def init_host(self, host):
-        LOG.debug('trying to apply OS Instance CRD')
-        created = self._os_crd_instance.create_manifest()
+        if CONF.kubernetes.apply_crds:
+            LOG.debug('trying to apply OS Instance CRD')
+            created = self._os_crd_instance.create_manifest()
 
-        if created:
-            LOG.info('OS Instance CRD created')
-        else:
-            LOG.info('OS Instance CRD already exists')
+            if created:
+                LOG.info('OS Instance CRD created')
+            else:
+                LOG.debug('OS Instance CRD already exists')
 
     def instance_exists(self, instance) -> bool:
         result = self._os_crd_instance.get(instance)

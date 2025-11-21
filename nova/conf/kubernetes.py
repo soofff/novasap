@@ -9,6 +9,15 @@ kubernetes_main_opts = [
     cfg.StrOpt('namespace',
                default='default',
                help="""
+The Kubernetes namespace in which to operate.
+"""),
+
+    cfg.BoolOpt('apply_crds',
+               default=False,
+               help="""
+Deploy the OpenStack CRDs to the Kubernetes cluster if they do not already exist.
+This requires that the user configured to access the cluster has sufficient
+privileges to create CustomResourceDefinitions.
 """),
 ]
 
