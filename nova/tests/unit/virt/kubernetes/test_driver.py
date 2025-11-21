@@ -187,3 +187,9 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
         driver = _create_driver()
         result = driver.get_nodenames_by_uuid()
         self.assertEqual(result, {driver._local_node_uuid: driver._hostname})
+
+    def test_get_available_nodes(self):
+        driver = _create_driver()
+        driver._hostname = 'test-node'
+        result = driver.get_available_nodes()
+        self.assertEqual(result, ['test-node'])

@@ -391,7 +391,7 @@ class KubernetesDriver(driver.ComputeDriver):
         pass
 
     def get_available_nodes(self, refresh=False):
-        pass
+        return [self._hostname]
 
     def get_nodenames_by_uuid(self, refresh=False):
         # TODO: store to crd ?
