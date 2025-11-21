@@ -387,7 +387,8 @@ class KubernetesDriver(driver.ComputeDriver):
         pass
 
     def get_nodenames_by_uuid(self, refresh=False):
-        pass
+        # TODO: use crd ?
+        return LibvirtDriver.get_nodenames_by_uuid(self, refresh)
 
     def get_host_cpu_stats(self):
         pass
