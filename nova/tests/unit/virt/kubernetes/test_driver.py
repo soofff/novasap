@@ -2,6 +2,7 @@ from nova import test
 from unittest import mock
 from kubernetes import client
 from nova.tests.unit.objects import test_diagnostics
+from nova.virt.hardware import InstanceInfo
 from nova.virt.kubernetes import driver as kubernetes_driver
 from nova import objects
 
@@ -57,7 +58,8 @@ def _create_test_instance():
         'resources': None,
         'migration_context': None,
         'info_cache': None,
-        'vm_state': 'active'
+        'vm_state': 'active',
+        'power_state': 1,
     }
 
 
@@ -70,18 +72,21 @@ def _create_driver():
 class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparisonMixin):
     def setUp(self):
         super().setUp()
+
+        # Patch load_kube_config
         self.kube_config_patcher = mock.patch(
             'kubernetes.config.load_kube_config', autospec=True)
         self.mock_load_kube_config = self.kube_config_patcher.start()
         self.mock_load_kube_config.return_value = None
         self.addCleanup(self.kube_config_patcher.stop)
 
+        # Patch CustomObjectsApi
         self.kube_custom_obj_api_patcher = mock.patch(
             'kubernetes.client.CustomObjectsApi', autospec=True)
         self.mock_custom_obj_api = self.kube_custom_obj_api_patcher.start()
         self.mock_custom_obj_api.return_value.get_namespaced_custom_object.return_value = {
             "spec": {"uuid": "123", "display_name": "test"},
-            "status": {"vm_state": "active"},
+            "status": {"vm_state": "active", "power_state": 1},
             "action": None,
             "metadata": {"name": "test-instance"}
         }
@@ -101,17 +106,35 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
         }]
         }
 
+        # Patch CoreV1Api
+        self.kube_v1_api_patcher = mock.patch(
+            'kubernetes.client.CoreV1Api.read_node', autospec=True)
+        self.mock_v1_api = self.kube_v1_api_patcher.start()
+        self.mock_v1_api.return_value = mock.MagicMock()
+        self.mock_v1_api.return_value.metadata = mock.MagicMock()
+        self.mock_v1_api.return_value.metadata.uid = 'ff0183d3-fb29-485c-ac6c-2616c2ccb258'
+
+        self.addCleanup(self.kube_v1_api_patcher.stop)
+
     def test_init_host(self):
         driver = kubernetes_driver.KubernetesDriver(None)
         driver.init_host("test-host")
         self.assertEqual("test-host", driver._hostname)
-        self.assertIsNotNone(driver._local_node_uuid)
+        self.assertEqual("ff0183d3-fb29-485c-ac6c-2616c2ccb258",
+                         driver._k8s_node.metadata.uid)
 
     def test_get_host_uptime(self):
         driver = kubernetes_driver.KubernetesDriver(None)
         result = driver.get_host_uptime()
         self.assertIn("up", result)
         self.assertIn("load average", result)
+
+    def test_get_info(self):
+        test_instance = _create_test_instance()
+        driver = kubernetes_driver.KubernetesDriver(None)
+        result = driver.get_info(test_instance)
+        self.assertEqual(vars(result), vars(InstanceInfo(
+            state=1, internal_id='123')))
 
     def test_spawn(self):
         driver = _create_driver()
@@ -185,8 +208,10 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
 
     def test_get_nodenames_by_uuid(self):
         driver = _create_driver()
+        driver._get_node_from_k8s()
         result = driver.get_nodenames_by_uuid()
-        self.assertEqual(result, {driver._local_node_uuid: driver._hostname})
+        self.assertEqual(
+            result, {driver._k8s_node.metadata.uid: driver._hostname})
 
     def test_get_available_nodes(self):
         driver = _create_driver()

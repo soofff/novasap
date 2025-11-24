@@ -18,6 +18,7 @@ class OsCrdObjInstanceSpec(OsCrdObjSpec):
 @dataclass
 class OsCrdObjInstanceStatus(OsCrdObjStatus):
     vm_state: str = field(metadata={"print": True})
+    power_state: int = field(metadata={"print": True})
 
 
 class OsCrdObjInstanceActionState(str, Enum):
@@ -70,7 +71,8 @@ class OsCrdObjInstance(OsCrdObj, OsCrdObjBodyInstanceBody):
                 display_name=instance['display_name']
             ),
             status=OsCrdObjInstanceStatus(
-                vm_state=instance['vm_state']
+                vm_state=instance['vm_state'],
+                power_state=instance['power_state']
             ),
             action=OsCrdObjInstanceAction()
         )

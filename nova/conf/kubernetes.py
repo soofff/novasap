@@ -19,6 +19,14 @@ Deploy the OpenStack CRDs to the Kubernetes cluster if they do not already exist
 This requires that the user configured to access the cluster has sufficient
 privileges to create CustomResourceDefinitions.
 """),
+
+    cfg.StrOpt('config',
+               default=None,
+               help="""
+The path to the kubeconfig file to use to access the Kubernetes cluster.
+If not specified, the in-cluster configuration will be used when
+running inside a Kubernetes Pod, or the default kubeconfig file location will be used when running outside of a cluster.
+"""),
 ]
 
 

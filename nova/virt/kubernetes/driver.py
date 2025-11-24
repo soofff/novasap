@@ -20,22 +20,21 @@ Compute driver for Kubernetes clusters.
 """
 
 
-import time
-from oslo_log import log as logging
-from nova.network import model as network_model
 import typing as ty
+
+from oslo_log import log as logging
 
 from nova import objects
 from nova import context as nova_context
 import nova.conf
 from nova.objects.instance import Instance
 from nova.virt import driver
-
-from kubernetes import client, config, utils
-
+from nova.virt.hardware import InstanceInfo
 from nova.virt.kubernetes.os_crd_instance import OsCrdInstance, OsCrdObjBodyInstanceBody, OsCrdObjInstanceAction, OsCrdObjInstanceActionState
 from nova.virt.libvirt import LibvirtDriver
-from nova.virt.node import get_local_node_uuid
+from nova.network import model as network_model
+
+from kubernetes import client, config
 
 LOG = logging.getLogger(__name__)
 
@@ -88,20 +87,35 @@ class KubernetesDriver(driver.ComputeDriver):
     def __init__(self, virtapi, scheme="https"):
         super(KubernetesDriver, self).__init__(virtapi)
 
-        LOG.debug('Loading Kubernetes configuration')
-        try:
-            config.load_incluster_config()
-        except config.ConfigException:
-            config.load_kube_config()
+        self._hostname = None
+        self._k8s_node = None
 
+        self._load_kube_config()
         self._kubernetes = client.ApiClient()
+        self._kubernetes_v1 = client.CoreV1Api(self._kubernetes)
         self._os_crd_instance = OsCrdInstance(
             self._kubernetes, CONF.kubernetes.namespace)
 
-        self._hostname = None
-        self._local_node_uuid = None
+    def _load_kube_config(self):
+        if CONF.kubernetes.config:
+            LOG.info('Loading kubeconfig from %s', CONF.kubernetes.config)
+            config.load_kube_config(config_file=CONF.kubernetes.config)
+        else:
+            try:
+                LOG.info('Loading in-cluster kubeconfig')
+                config.load_incluster_config()
+            except config.ConfigException:
+                LOG.info('Loading default kubeconfig')
+                config.load_kube_config()
+
+    def _get_node_from_k8s(self):
+        LOG.debug('getting node UUID from Kubernetes for host %s', self._hostname)
+        node = self._kubernetes_v1.read_node(self._hostname)
+        self._k8s_node = node
 
     def init_host(self, host):
+        self._hostname = host
+
         if CONF.kubernetes.apply_crds:
             LOG.debug('trying to apply OS Instance CRD')
             created = self._os_crd_instance.create_manifest()
@@ -111,8 +125,7 @@ class KubernetesDriver(driver.ComputeDriver):
             else:
                 LOG.debug('OS Instance CRD already exists')
 
-        self._hostname = host
-        self._local_node_uuid = get_local_node_uuid()
+        self._get_node_from_k8s()
 
     def instance_exists(self, instance) -> bool:
         result = self._os_crd_instance.get(instance)
@@ -146,6 +159,15 @@ class KubernetesDriver(driver.ComputeDriver):
     def cleanup(self, context, instance, network_info, block_device_info=None,
                 destroy_disks=True, migrate_data=None, destroy_vifs=True, destroy_secrets=True):
         pass
+    
+    def get_info(self, instance, use_cache=True):
+        obj = self._os_crd_instance.get(instance)
+
+        return InstanceInfo(
+            state=obj.status["power_state"],
+            internal_id=obj.spec["uuid"]
+        )
+
 
     def cleanup_lingering_instance_resources(self, instance):
         pass
@@ -394,8 +416,7 @@ class KubernetesDriver(driver.ComputeDriver):
         return [self._hostname]
 
     def get_nodenames_by_uuid(self, refresh=False):
-        # TODO: store to crd ?
-        return {self._local_node_uuid: self._hostname}
+        return {self._k8s_node.metadata.uid: self._hostname}
 
     def get_host_cpu_stats(self):
         pass
