@@ -111,10 +111,32 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
             'kubernetes.client.CoreV1Api.read_node', autospec=True)
         self.mock_v1_api = self.kube_v1_api_patcher.start()
         self.mock_v1_api.return_value = mock.MagicMock()
-        self.mock_v1_api.return_value.metadata = mock.MagicMock()
         self.mock_v1_api.return_value.metadata.uid = 'ff0183d3-fb29-485c-ac6c-2616c2ccb258'
-
+        self.mock_v1_api.return_value.status.capacity = {
+            'cpu': '4',
+        }
         self.addCleanup(self.kube_v1_api_patcher.stop)
+
+        # Patch get_fs_info
+        self.get_fs_info_patcher = mock.patch(
+            "nova.virt.libvirt.utils.get_fs_info", autospec=True)
+        self.mock_get_fs_info = self.get_fs_info_patcher.start()
+        self.mock_get_fs_info.return_value = {
+            'total': 100 * 1024 * 1024 * 1024,
+            'used': 50 * 1024 * 1024 * 1024,
+            'free': 50 * 1024 * 1024 * 1024,
+        }
+        self.addCleanup(self.get_fs_info_patcher.stop)
+
+        # Patch psutil.virtual_memory
+        self.psutil_virtual_memory_patcher = mock.patch(
+            "psutil.virtual_memory", autospec=True)
+        self.mock_psutil_virtual_memory = self.psutil_virtual_memory_patcher.start()
+        mock_memory = mock.MagicMock()
+        mock_memory.total = 8 * 1024 * 1024 * 1024
+        mock_memory.used = 4 * 1024 * 1024 * 1024
+        self.mock_psutil_virtual_memory.return_value = mock_memory
+        self.addCleanup(self.psutil_virtual_memory_patcher.stop)
 
     def test_init_host(self):
         driver = kubernetes_driver.KubernetesDriver(None)
@@ -218,3 +240,68 @@ class KubernetesTestCase(test.NoDBTestCase, test_diagnostics.DiagnosticsComparis
         driver._hostname = 'test-node'
         result = driver.get_available_nodes()
         self.assertEqual(result, ['test-node'])
+
+    def test_get_available_resources(self):
+        driver = _create_driver()
+        driver._get_node_from_k8s()
+        driver._hostname = 'test-node'
+        result = driver.get_available_resource("test-node")
+        self.assertEqual(result, {
+            'host_hostname': 'test-node',
+            'host_name_label': 'test-node',
+            'hypervisor_hostname': 'test-node',
+            'hypervisor_type': 'CHV',
+            'local_gb': 100.0,
+            'local_gb_used': 50.0,
+            'memory_mb': 8192,
+            'memory_mb_used': 4096,
+            'supported_instances': [('x86_64', 'kvm', 'hvm')],
+            'vcpus': 4,
+            'vcpus_used': 0,
+            'numa_topology': None
+            }
+        )
+
+    def test_update_provider_tree(self):
+        provider_tree_mock = mock.MagicMock()
+        provider_tree_mock.exists.return_value = False
+
+        driver = _create_driver()
+        driver._hostname = 'test-host'
+        driver._get_node_from_k8s()
+        driver.update_provider_tree(provider_tree_mock, "test-host")
+
+        new_root_args = provider_tree_mock.new_root.call_args.args
+        self.assertEqual(new_root_args, (
+            'test-host',
+            'ff0183d3-fb29-485c-ac6c-2616c2ccb258'
+        ))
+
+        update_inventory_args = provider_tree_mock.update_inventory.call_args.args
+        self.assertEqual(update_inventory_args, (
+            'test-host',
+            {
+                'DISK_GB': {
+                'allocation_ratio': 1,
+                    'max_unit': 100,
+                    'min_unit': 1,
+                    'reserved': 0,
+                    'step_size': 1,
+                    'total': 100 
+                }, 'MEMORY_MB': {
+                    'allocation_ratio': 1,
+                    'max_unit': 0,
+                    'min_unit': 1,
+                    'reserved': 512,
+                    'step_size': 1,
+                    'total': 0
+                }, 'VCPU': {
+                    'allocation_ratio': 1,
+                    'max_unit': 4,
+                    'min_unit': 1,
+                    'reserved': 0,
+                    'step_size': 1,
+                    'total': 4
+                }
+            }
+        ))

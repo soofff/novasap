@@ -31,6 +31,7 @@ from nova.objects.instance import Instance
 from nova.virt import driver
 from nova.virt.hardware import InstanceInfo
 from nova.virt.kubernetes.os_crd_instance import OsCrdInstance, OsCrdObjBodyInstanceBody, OsCrdObjInstanceAction, OsCrdObjInstanceActionState
+from nova.virt.kubernetes.utils import k8s_unit_to_mb
 from nova.virt.libvirt import LibvirtDriver
 from nova.network import model as network_model
 
@@ -336,10 +337,95 @@ class KubernetesDriver(driver.ComputeDriver):
         pass
 
     def update_provider_tree(self, provider_tree, nodename, allocations=None):
-        pass
+        # TODO review this implementation and verify correctness
+        from nova.objects import fields as obj_fields
+        from nova.virt.libvirt import utils as libvirt_utils
+        from oslo_utils import units
+        import os_resource_classes as orc
+
+        status = self._k8s_node.status
+        
+        cpu_capacity = int(status.capacity.get('cpu', 0))
+        
+        memory_str = status.capacity.get('memory', '0Ki')
+        memory_mb = k8s_unit_to_mb(memory_str) 
+
+        disk = libvirt_utils.get_fs_info(CONF.instances_path)
+        disk_gb = int(disk['total'] / units.Gi)
+        
+        if not provider_tree.exists(nodename):
+            provider_tree.new_root(
+                nodename,
+                self._k8s_node.metadata.uid, 
+                generation=0
+            )
+        
+        inventory = {
+            orc.VCPU: {
+                'total': cpu_capacity,
+                'reserved': 0,
+                'min_unit': 1,
+                'max_unit': cpu_capacity,
+                'step_size': 1,
+                'allocation_ratio': 1,
+            },
+            orc.MEMORY_MB: {
+                'total': memory_mb,
+                'reserved': 512,  # Reserve some memory for the system
+                'min_unit': 1,
+                'max_unit': memory_mb,
+                'step_size': 1,
+                'allocation_ratio': 1,
+            },
+            orc.DISK_GB: {
+                'total': disk_gb,
+                'reserved': 0,
+                'min_unit': 1,
+                'max_unit': disk_gb,
+                'step_size': 1,
+                'allocation_ratio': 1,
+            },
+        }
+        
+        provider_tree.update_inventory(nodename, inventory)
+
 
     def get_available_resource(self, nodename):
-        pass
+        import psutil
+        from nova.objects import fields as obj_fields
+        from nova.virt.libvirt import utils as libvirt_utils
+        from oslo_utils import units
+
+        status = self._k8s_node.status
+
+        disk = libvirt_utils.get_fs_info(CONF.instances_path)
+        for (k, v) in disk.items():
+            disk[k] = v / units.Gi
+
+        memory = psutil.virtual_memory()
+
+        # TODO probably better to get this from k8s  crd (?)
+        host_status = {}
+        host_status["hypervisor_type"] = "CHV"
+        host_status["supported_instances"] = [
+                (
+                    obj_fields.Architecture.X86_64,
+                    obj_fields.HVType.KVM,
+                    obj_fields.VMMode.HVM,
+                )
+            ]
+        host_status["host_hostname"] = nodename
+        host_status["host_name_label"] = nodename
+        host_status["hypervisor_hostname"] = nodename
+        host_status["local_gb"] = disk['total']
+        host_status["local_gb_used"] = disk['used']
+        host_status["memory_mb"] = memory.total // 1024 // 1024
+        host_status["memory_mb_used"] = memory.used // 1024 // 1024
+        host_status["vcpus"] = int(status.capacity['cpu'])
+        host_status["vcpus_used"] = 0  # TODO
+        host_status["numa_topology"] = None
+
+        return host_status
 
     def check_instance_shared_storage_local(self, context, instance):
         pass
