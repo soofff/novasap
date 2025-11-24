@@ -108,8 +108,8 @@ class OsCrd(Generic[T]):
         self.api_ext = client.ApiextensionsV1Api(api_client)
         self.namespace = namespace
 
-    def create_manifest(self) -> bool:
-        crd_manifest = {
+    def _manifest(self) -> str:
+        return {
             "apiVersion": "apiextensions.k8s.io/v1",
             "kind": "CustomResourceDefinition",
             "metadata": {
@@ -154,16 +154,16 @@ class OsCrd(Generic[T]):
             }
         }
 
+    def create_manifest(self) -> bool:
         try:
-            self.api_ext.create_custom_resource_definition(crd_manifest)
+            self.api_ext.create_custom_resource_definition(self._manifest())
         except ApiException as e:
             if e.status == 409:  # Conflict - already exists
                 return False
             else:
                 raise e
-            
+
         return True
-    
 
     def create_object(self, obj: OsCrdObj):
         obj.kind = self.CRD_KIND
