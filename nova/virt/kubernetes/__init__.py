@@ -14,7 +14,27 @@
 #    under the License.
 """
 :mod:`kubernetes` -- Nova support for Kubernetes Cluster.
+
+This module provides a Nova compute driver that exports instance lifecycle
+operations to Kubernetes CRDs, matching the monsoon4 nova reimplementation
+schema for controller compatibility.
 """
 from nova.virt.kubernetes import driver
+from nova.virt.kubernetes.crd_instance import (
+    InstanceCrd, InstanceObject, PowerState, RebootType, VmState
+)
+from nova.virt.kubernetes.crd_port import PortCrd, PortObject, PortPhase
 
 KubernetesDriver = driver.KubernetesDriver
+
+__all__ = [
+    'KubernetesDriver',
+    'InstanceCrd',
+    'InstanceObject',
+    'PowerState',
+    'RebootType',
+    'VmState',
+    'PortCrd',
+    'PortObject',
+    'PortPhase',
+]

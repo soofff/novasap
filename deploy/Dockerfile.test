@@ -1,0 +1,23 @@
+# Test runner image based on the nova base image
+# This ensures we have the correct Python version and dependencies
+
+ARG FROM=keppel.eu-de-1.cloud.sap/ccloud/loci-nova:bobcat-latest
+FROM ${FROM}
+
+SHELL ["/bin/bash", "-c"]
+
+# Install test dependencies - pin versions compatible with Python 3.10 and existing fixtures
+RUN pip3 install --no-cache-dir \
+    'stestr>=2.0.0,<5.0.0' \
+    'oslotest>=3.8.0,<5.0.0' \
+    'testtools>=2.5.0,<2.7.0' \
+    'ddt>=1.2.1' \
+    'coverage>=4.0' \
+    'wsgi-intercept>=1.7.0' \
+    'requests-mock>=1.2.0' \
+    'kubernetes'
+
+WORKDIR /nova
+
+# Default command runs kubernetes driver tests
+CMD ["stestr", "run", "nova.tests.unit.virt.kubernetes"]
